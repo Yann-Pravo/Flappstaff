@@ -1,0 +1,563 @@
+        -:    0:Source:../src/source/FacebookLib.c
+        -:    0:Graph:../src/source/FacebookLib.gcno
+        -:    0:Data:../src/source/FacebookLib.gcda
+        -:    0:Runs:6
+        -:    0:Programs:1
+        -:    1:/*
+        -:    2: _____ _                 _         __  __ 
+        -:    3:|  ___| | __ _ _ __  ___| |_ __ _ / _|/ _|
+        -:    4:| |_  | |/ _` | '_ \/ __| __/ _` | |_| |_ 
+        -:    5:|  _| | | (_| | |_) \__ \ || (_| |  _|  _|
+        -:    6:|_|   |_|\__,_| .__/|___/\__\__,_|_| |_|  
+        -:    7:              |_|                         
+        -:    8:Flapstaff is a Light And Powerful Social Text Analyser For Facebook
+        -:    9:
+        -:   10:Coders:
+        -:   11:benjamin.crespo.ballester(at)gmail(dot)com
+        -:   12:yann.pravo(at)gmail(dot)com
+        -:   13:mathieu.triay(at)gmail(dot)com
+        -:   14:
+        -:   15:Repo: http://bitbucket.org/nagy/flapstaff/
+        -:   16:*/
+        -:   17:
+        -:   18:#include "../headers/FacebookLib.h"
+        -:   19:#include "../headers/TPersonne.h"
+        -:   20:
+        -:   21:/*
+        -:   22:*	Retourne une fréquence aléatoire pour la connexion au réseau
+        -:   23:*
+        -:   24:*	@return un nombre entre 720 et 1
+        -:   25:*/
+        -:   26:int getRandomFrequency()
+      207:   27:{	
+      207:   28:	return (rand() % 720) + 1;
+        -:   29:}
+        -:   30:
+        -:   31:/*
+        -:   32:*	Trouve 2 ID au hasard pour chercher une mise en relation
+        -:   33:*	
+        -:   34:*	@param friends, la liste d'amis + son nombre
+        -:   35:*	@return question de structure relationship (2 ID)
+        -:   36:*/
+        -:   37:struct relationship getRandomRelationship(struct facebookFriends friends)
+        4:   38:{
+        -:   39:	struct relationship question;
+        -:   40:
+        4:   41:	strcpy(question.id1, friends.friends[(rand() % friends.nbFriends)].id);	
+        4:   42:	strcpy(question.id2, friends.friends[(rand() % friends.nbFriends)].id);
+        -:   43:	
+        4:   44:	return question;
+        -:   45:}
+        -:   46:
+        -:   47:/*
+        -:   48:*	Permet de regarder si un ID est déjà présent dans la liste d'amis
+        -:   49:*	pour éviter les doublons lors de l'insertion d'une nouvelle liste
+        -:   50:*
+        -:   51:*	@param friends, les amis + leur nombre
+        -:   52:*	@param fbID, ID facebook
+        -:   53:*	@return bool, 1 si il y est, 0 sinon
+        -:   54:*/
+        -:   55:int isAlreadyFriend(struct facebookFriends friends, char fbID[20])
+      212:   56:{
+      212:   57:	int i = 0;
+      212:   58:	int found = 0;
+        -:   59:	
+    22581:   60:	while (i < friends.nbFriends && !found)
+        -:   61:	{
+    22157:   62:		found = (strcmp(friends.friends[i].id, fbID) == 0);
+    22157:   63:		i++;
+        -:   64:	}
+        -:   65:	
+      212:   66:	return found;
+        -:   67:}
+        -:   68:
+        -:   69:/*
+        -:   70:*	Crée une personne à partir de son ID Facebook
+        -:   71:*	Permet par exemple de retrouver le nom de quelqu'un
+        -:   72:*	
+        -:   73:*	@param, id, ID facebook d'une personne
+        -:   74:*	@return une personne avec nom, id et fréquence
+        -:   75:*/
+        -:   76:struct Personne getFacebookPerson(char id[20])
+        1:   77:{
+        -:   78:	CURL *curl;
+        -:   79:	CURLcode res;
+        1:   80:	char* nom = malloc(50*sizeof(char));
+        -:   81:	char urlQuery[50];
+        1:   82:	FILE * fichier = tmpfile();
+        -:   83:	struct Personne pers;
+        -:   84:	
+        1:   85:	sprintf(urlQuery, "http://graph.facebook.com/%s", id);
+        -:   86:
+        1:   87:  	curl = curl_easy_init();
+        -:   88:
+        1:   89:    	curl_easy_setopt(curl, CURLOPT_URL, urlQuery);
+        1:   90:	curl_easy_setopt(curl, CURLOPT_WRITEDATA, fichier);
+        -:   91:	
+        1:   92:    	res = curl_easy_perform(curl);
+        1:   93:	curl_easy_cleanup(curl);
+        -:   94:		
+        1:   95:	rewind(fichier);
+        -:   96:
+        -:   97:	/* On lit le fichier qu'on vient d'écrire pour extraire le status */
+        1:   98:	fscanf(fichier, "%*[^:]:%*[^:]: \"%[^\"]\"", nom);
+        -:   99:	
+        1:  100:	fclose(fichier);
+        -:  101:	
+        1:  102:	pers = createPersonne(id, nom, getRandomFrequency());
+        1:  103:	free(nom);
+        -:  104:	
+        1:  105:	return pers;
+        -:  106:}
+        -:  107:
+        -:  108:/*
+        -:  109:*	TODO: Optimiser la parcelisation des requêtes si possible
+        -:  110:*
+        -:  111:*	Calcul les correspondances necessaires entre les amis pour générer
+        -:  112:*	une requête qu'on envoi sur Facebook pour savoir si 2 personnes
+        -:  113:*	sont effectivement amis ou non. On écrit le résultat dans le fichier
+        -:  114:*	donné en paramètre.
+        -:  115:*	Est appelée par getFacebookRelationships
+        -:  116:*
+        -:  117:*	@param fbfriends, les amis et leur nombre
+        -:  118:*	@param token, token d'identification Facebook
+        -:  119:*	@param fichier, un fichier ouvert et où on peut écrire
+        -:  120:*	@param start, id du tableau sur lequel on commence
+        -:  121:*/
+        -:  122:void writeFacebookRelationships(struct facebookFriends fbFriends, char *token, FILE * fichier, int start)
+        2:  123:{
+        -:  124:	CURL* curl;
+        -:  125:	CURLcode res;
+        -:  126:	char *postfields;
+        -:  127:		
+        -:  128:	int i, j;
+        2:  129:	int nPos1 = 0;
+        2:  130:	int nPos2 = 0;
+        2:  131:	int nbRel = 0;
+        -:  132:
+        -:  133:	/* Calcul du nombre de relation :
+        -:  134:		Le nombre de relations total :
+        -:  135:			fbFriends.nbFriends * (fbFriends.nbFriends - 1))/2
+        -:  136:		Le nombre de relations pour M amis sur les N amis totaux :
+        -:  137:			N-1 + N-1 +...+ N-M = M(2N - M - 1)/2
+        -:  138:	
+        -:  139:	   Si il y a plus de 250 000 relations, Facebook ne renvoit rien,
+        -:  140:	   on limite donc le risque en découpant en morceaux. On ajoute 
+        -:  141:	   le nombre d'amis aux 250 000 pour éviter le cas où on dépasse les 
+        -:  142:	   250 000 (249 999 au dernier tour de boucle, on repart mais on 
+        -:  143:	   dépassera si on ne prévoit pas une marge).
+        -:  144:	*/
+        -:  145:
+        2:  146:	char *ids2 = (char*) calloc(16 * (250000 + fbFriends.nbFriends), sizeof(char));
+        2:  147:	char *ids1 = (char*) calloc(16 * (250000 + fbFriends.nbFriends), sizeof(char));
+        -:  148:	
+        2:  149:	printf("Préparation de la requête\n");
+        -:  150:	
+        -:  151:	/* Génération des ids et des correspondances */
+       12:  152:	for(i = start; i < fbFriends.nbFriends && nbRel < 250000; i++)
+        -:  153:	{
+       30:  154:		for(j = i + 1; j < fbFriends.nbFriends; j++)
+        -:  155:		{	
+       20:  156:			nbRel++;
+       20:  157:			nPos2 += sprintf(ids2 + nPos2, "%s,", fbFriends.friends[j].id);
+       20:  158:			nPos1 += sprintf(ids1 + nPos1, "%s,", fbFriends.friends[i].id);
+        -:  159:		}
+        -:  160:	}
+        -:  161:	
+        2:  162:	postfields = malloc((200 + (((250000 + fbFriends.nbFriends) * 2) * 16)) * sizeof(char));
+        -:  163:	
+        2:  164:	printf("Fin de la préparation de la requête\n");
+        -:  165:	
+        2:  166:	sprintf(postfields, "&access_token=%s&uids1=%s&uids2=%s", token, ids1, ids2);
+        -:  167:	
+        2:  168:	free(ids1);
+        2:  169:	free(ids2);
+        -:  170:	
+        2:  171:	printf("Envoi de la requête à Facebook\n");
+        -:  172:	/* Envoi de la requête à Facebook _VERY_SLOW_ */
+        2:  173:  	curl = curl_easy_init();
+        2:  174:    	curl_easy_setopt(curl, CURLOPT_URL, "https://api.facebook.com/method/friends.areFriends?format=json");
+        2:  175:	curl_easy_setopt(curl, CURLOPT_POST, 1);
+        2:  176:	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postfields);
+        2:  177:	curl_easy_setopt(curl, CURLOPT_WRITEDATA, fichier);
+        2:  178:    	res = curl_easy_perform(curl);
+        2:  179:	curl_easy_cleanup(curl);
+        -:  180:	
+        2:  181:	free(postfields);
+        -:  182:	
+        2:  183:	if (i < fbFriends.nbFriends)
+        -:  184:	{
+    #####:  185:		writeFacebookRelationships(fbFriends, token, fichier, i);
+        -:  186:	}
+        -:  187:}
+        -:  188:
+        -:  189:/*
+        -:  190:*	Cherche les amis pour un ID donné et les place dans un tableau
+        -:  191:*	de structure Personne.
+        -:  192:*
+        -:  193:*	@param id, ID facebook de la personne dont on veut les amis
+        -:  194:*	@param token, token corresspondant à l'ID pour avoir l'auth
+        -:  195:*	@return les amis récupérés + leur nombre
+        -:  196:*/
+        -:  197:struct facebookFriends getFacebookFriends(char id[20], char* token)
+    #####:  198:{
+        -:  199:	CURL *curl;
+        -:  200:	CURLcode res;
+        -:  201:	
+        -:  202:	struct Personne pers;
+    #####:  203:	char *name = malloc(40 * sizeof(char));
+    #####:  204:	char *idPers = malloc(20 * sizeof(char));
+        -:  205:	
+        -:  206:	struct facebookFriends fbFriends;
+    #####:  207:	fbFriends.friends = malloc(sizeof(struct Personne));
+    #####:  208:	fbFriends.nbFriends = 0;
+        -:  209:
+        -:  210:	char urlQuery[200];
+    #####:  211:	FILE * fichier = tmpfile();
+        -:  212:	long fileSize;
+        -:  213:	char *friendList, *friendToken;
+        -:  214:	
+    #####:  215:	sprintf(urlQuery, "https://graph.facebook.com/%s/friends/?access_token=%s", id, token);
+        -:  216:
+    #####:  217:  	curl = curl_easy_init();
+        -:  218:
+    #####:  219:    	curl_easy_setopt(curl, CURLOPT_URL, urlQuery);
+    #####:  220:	curl_easy_setopt(curl, CURLOPT_WRITEDATA, fichier);
+        -:  221:	
+    #####:  222:    	res = curl_easy_perform(curl);
+    #####:  223:	curl_easy_cleanup(curl);
+        -:  224:	
+        -:  225:	/* On obtient la taille du fichier ! */
+    #####:  226:	fileSize = ftell(fichier);
+    #####:  227:	rewind(fichier);
+        -:  228:	
+        -:  229:	/* On stocke la ligne (!!) dans une variable string */
+    #####:  230:	friendList = malloc(fileSize * sizeof(char));
+    #####:  231:	fgets(friendList, fileSize, fichier);
+    #####:  232:	fclose(fichier);
+        -:  233:	
+    #####:  234:	friendList[0] = '['; /* Remplace le premier { gênant pour extraire */
+    #####:  235:	friendToken = strtok(friendList, "}");
+        -:  236:	
+    #####:  237:	while (friendToken != NULL)
+        -:  238:	{
+    #####:  239:		if (sscanf(friendToken, "%*[^{]{\"name\":\"%[^\"]\",\"id\":\"%[^\"]", name, idPers) != -1)
+        -:  240:		{
+    #####:  241:			pers = createPersonne(idPers, name, getRandomFrequency());
+        -:  242:
+    #####:  243:			fbFriends.friends[fbFriends.nbFriends] = pers;
+    #####:  244:			fbFriends.nbFriends += 1;
+        -:  245:
+    #####:  246:			fbFriends.friends = (struct Personne*) realloc(fbFriends.friends, 
+        -:  247:				            (fbFriends.nbFriends + 1) * sizeof(struct Personne));
+        -:  248:		}
+        -:  249:		
+    #####:  250:		friendToken = strtok(NULL, "}");
+        -:  251:	}
+        -:  252:	
+        -:  253:	/* On ajoute la personne originale */
+    #####:  254:	fbFriends.friends[fbFriends.nbFriends] = getFacebookPerson(id);
+    #####:  255:	fbFriends.nbFriends += 1;
+        -:  256:
+    #####:  257:	free(name);
+    #####:  258:	free(idPers);
+    #####:  259:	free(friendList);
+    #####:  260:	free(friendToken);
+        -:  261:
+    #####:  262:	return fbFriends;
+        -:  263:}
+        -:  264:
+        -:  265:/*
+        -:  266:*	Extrait les amis d'un fichier HTML facebook donné
+        -:  267:*	et les ajoute aux amis existants si ils ne le sont pas déjà
+        -:  268:*
+        -:  269:*	@param fbFriends, amis existants + nombre
+        -:  270:*	@param friendFile, string contenant la page HTML complète
+        -:  271:*	@return amis existant + ceux récupérés et leur nombre
+        -:  272:*/
+        -:  273:struct facebookFriends extractFriendsFromHTML(struct facebookFriends fbFriends, char *friendFile)
+        1:  274:{
+        -:  275:	char idFriend[20], nameFriend[40];
+        -:  276:	struct Personne pers;
+        1:  277:	struct facebookFriends newFbFriends = fbFriends;
+        -:  278:	
+        -:  279:	regex_t rId;
+        -:  280:	regex_t rName;
+        -:  281:	regmatch_t matches[2];	
+        -:  282:		
+        1:  283:	int start = 0;			
+        1:  284:	int result = 0;
+        -:  285:	
+        -:  286:	/* On prépare les regex pour utiliser l'ID et le nom */
+        1:  287:	regcomp(&rId, "<div class=.\"ffriend clearfix.\" id=.\"f([0123456789]+).\"", REG_EXTENDED);
+        1:  288:	regcomp(&rName, "class=.\"fname.\">([a-zA-Z \\0-9]+)<", REG_EXTENDED);
+        -:  289:
+      211:  290:	while (result == 0)
+        -:  291:	{
+        -:  292:		/* On regarde si on voit un ID à partir du point précédent */
+      209:  293:		result = regexec(&rId, friendFile + start, 2, matches, 0);
+        -:  294:
+      209:  295:		if (result == 0)
+        -:  296:		{
+        -:  297:			/* On récupère la taille pour couper les bits en trop */
+      208:  298:			int len = matches[1].rm_eo - matches[1].rm_so;
+        -:  299:
+        -:  300:			/* On copie l'ID dans la variable et on coupe à la longueur */
+      208:  301:			strncpy(idFriend, friendFile + start + matches[1].rm_so, len);
+      208:  302:			idFriend[len] = 0;
+        -:  303:			
+        -:  304:			/* On avance dans le fichier jusqu'a la fin de l'ID */
+      208:  305:			start += matches[1].rm_eo;
+        -:  306:			
+        -:  307:			/* Si l'ID n'est pas déjà présent, 
+        -:  308:			on va chercher le nom et on ajoute */
+      208:  309:			if (!isAlreadyFriend(newFbFriends, idFriend))
+        -:  310:			{
+      206:  311:				result = regexec(&rName, friendFile + start, 2, matches, 0);
+        -:  312:
+        -:  313:				/* Si la personne a un nom trop long, on l'oubli... */
+      206:  314:				if (result == 0 && (matches[1].rm_eo - matches[1].rm_so) < 40)
+        -:  315:				{
+        -:  316:					/* Même processus que l'ID */
+        -:  317:					
+      205:  318:					int len = matches[1].rm_eo - matches[1].rm_so;
+        -:  319:					
+      205:  320:					strncpy(nameFriend, friendFile + start + matches[1].rm_so, len);
+      205:  321:					nameFriend[len] = 0;
+        -:  322:					
+      205:  323:					start += matches[1].rm_eo;
+        -:  324:					
+        -:  325:					/* On créée la personne et on l'ajoute ! */
+      205:  326:					pers = createPersonne(idFriend, nameFriend, getRandomFrequency());
+      205:  327:					newFbFriends.friends = (struct Personne*) realloc(newFbFriends.friends, 
+        -:  328:								(newFbFriends.nbFriends + 1) * sizeof(struct Personne));
+      205:  329:					newFbFriends.friends[newFbFriends.nbFriends] = pers;
+      205:  330:					newFbFriends.nbFriends += 1;
+        -:  331:				}	
+        -:  332:			}
+        -:  333:		}
+        -:  334:	}
+        -:  335:	
+        1:  336:	regfree(&rId);
+        1:  337:	regfree(&rName);
+        -:  338:	
+        1:  339:	return newFbFriends;
+        -:  340:}
+        -:  341:
+        -:  342:/*
+        -:  343:*	Logge une personne avec ses identifiants Facebook
+        -:  344:*	IL faudra qu'elle ait autorisé l'accès à Flapstaff sur Facebook
+        -:  345:*	Calcul le token necessaire aux opérations de bases
+        -:  346:*
+        -:  347:*	@param mail, mail utilisé pour se connecter à Facebook
+        -:  348:*	@param pass, password utilisé pour Facebook
+        -:  349:*	@return token d'auth Facebook
+        -:  350:*/
+        -:  351:char* facebookConnect(char *mail, char *pass)
+        1:  352:{
+        -:  353:	CURL *curl;			
+        -:  354:	CURLcode res;
+        1:  355:	FILE * fichier = tmpfile();
+        -:  356:	
+        -:  357:	/* On se créée un faux header - de qualité - pour éviter de se faire ban */
+        1:  358:	struct curl_slist *chunk = NULL;
+        1:  359:	chunk = curl_slist_append(chunk, "'Accept: text/html, application/xhtml+xml, application/xml");
+        1:  360:	chunk = curl_slist_append(chunk, "Accept-Charset: utf-8;q=1.0,*;q=0.1");
+        1:  361:	chunk = curl_slist_append(chunk, "Accept-Language: en-gb, en");
+        1:  362:	chunk = curl_slist_append(chunk, "Keep-Alive: 300");
+        1:  363:	chunk = curl_slist_append(chunk, "Connection: keep-alive");
+        1:  364:	chunk = curl_slist_append(chunk, "User-Agent: Mozilla/5.0 (X11; U; Linux i686; en-GB; rv:1.9.0.6) Gecko/2009020911 Ubuntu/8.10 (intrepid) Firefox/3");
+        -:  365:
+        1:  366:	char *newURL = malloc(200 * sizeof(char));
+        1:  367:	char *token = malloc(200 * sizeof(char));
+        1:  368:	char *postfields = malloc(200 * sizeof(char));
+        -:  369:	
+        1:  370:	sprintf(postfields, "email=%s&pass=%s&persistent=1", mail, pass);
+        -:  371:	
+        1:  372:	curl = curl_easy_init();
+        1:  373:	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+        1:  374:	curl_easy_setopt(curl, CURLOPT_COOKIEFILE, "");
+        1:  375:	curl_easy_setopt(curl, CURLOPT_WRITEDATA, fichier);
+        1:  376:	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
+        1:  377:	curl_easy_setopt(curl, CURLOPT_URL, "https://login.facebook.com/login.php?login_attempt=1");
+        1:  378:	res = curl_easy_perform(curl);
+        -:  379:
+        1:  380:	curl_easy_setopt(curl, CURLOPT_URL, "https://login.facebook.com/login.php?login_attempt=1");
+        1:  381:	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postfields);
+        1:  382:	curl_easy_setopt(curl, CURLOPT_COOKIEFILE, "cookies_auth.txt");
+        1:  383:	curl_easy_setopt(curl, CURLOPT_COOKIEJAR, "cookies_auth.txt");
+        1:  384:	res = curl_easy_perform(curl);
+        -:  385:	
+        1:  386:	curl_easy_setopt(curl, CURLOPT_URL, "https://graph.facebook.com/oauth/authorize?client_id=106303829413149&redirect_uri=http://www.facebook.com/connect/login_success.html&type=user_agent&display=popup");
+        1:  387:	res = curl_easy_perform(curl);
+        1:  388:	res = curl_easy_getinfo(curl, CURLINFO_EFFECTIVE_URL, &newURL);
+        -:  389:	
+        1:  390:	fclose(fichier);
+        1:  391:	curl_slist_free_all(chunk);
+        1:  392:	curl_easy_cleanup(curl);
+        1:  393:	free(postfields);
+        -:  394:	
+        1:  395:	sscanf(newURL, "%*[^#]#access_token=%s", token);
+        -:  396:	
+        1:  397:	return token;
+        -:  398:}
+        -:  399:
+        -:  400:/*
+        -:  401:*	A partir d'une liste d'amis, récupère les amis de ceux-ci et les place
+        -:  402:*	dans la liste d'amis en tant que Personne.
+        -:  403:*	Necessite qu'une connexion à Facebook ait été établie avec 
+        -:  404:*	facebookConnect().
+        -:  405:*	Test : testFriendsOfFriends	
+        -:  406:*
+        -:  407:*	@param fbFriends, liste d'amis + nombre
+        -:  408:*	@param nbMax, nombre approx d'amis souhaité
+        -:  409:*	@return facebookFriends, liste d'amis complémentée par les amis d'amis
+        -:  410:*/
+        -:  411:struct facebookFriends getFriendsOfFriends(struct facebookFriends fbFriends, int nbMax)
+        1:  412:{	
+        -:  413:	CURL *curl;			
+        -:  414:	CURLcode res;
+        -:  415:	
+        1:  416:	struct curl_slist *chunk = NULL;
+        1:  417:	chunk = curl_slist_append(chunk, "'Accept: text/html, application/xhtml+xml, application/xml");
+        1:  418:	chunk = curl_slist_append(chunk, "Accept-Charset: utf-8;q=1.0,*;q=0.1");
+        1:  419:	chunk = curl_slist_append(chunk, "Accept-Language: en-gb, en");
+        1:  420:	chunk = curl_slist_append(chunk, "Keep-Alive: 300");
+        1:  421:	chunk = curl_slist_append(chunk, "Connection: keep-alive");
+        1:  422:	chunk = curl_slist_append(chunk, "User-Agent: Mozilla/5.0 (X11; U; Linux i686; en-GB; rv:1.9.0.6) Gecko/2009020911 Ubuntu/8.10 (intrepid) Firefox/3");
+        -:  423:	
+        1:  424:	struct facebookFriends newFbFriends = fbFriends;
+        -:  425:	FILE * fichier;
+        -:  426:	char urlQuery[200];
+        -:  427:	int i, fileSize;
+        -:  428:	char *friendFile;
+        -:  429:	
+        1:  430:	curl = curl_easy_init();
+        1:  431:	curl_easy_setopt(curl, CURLOPT_COOKIEFILE, "cookies_auth.txt");
+        1:  432:	curl_easy_setopt(curl, CURLOPT_COOKIEJAR, "cookies_auth.txt");
+        1:  433:	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+        -:  434:	
+        2:  435:	for(i = 0; i < fbFriends.nbFriends && newFbFriends.nbFriends < nbMax; i++)
+        -:  436:	{
+        1:  437:		sprintf(urlQuery, "http://www.facebook.com/friends/?id=%s", newFbFriends.friends[i].id);
+        1:  438:		fichier = tmpfile();
+        -:  439:
+        -:  440:		/* On récupère le fichier HTML et on le stocke dans un string */
+        1:  441:		curl_easy_setopt(curl, CURLOPT_URL, urlQuery);
+        1:  442:		curl_easy_setopt(curl, CURLOPT_WRITEDATA, fichier);
+        1:  443:	    	res = curl_easy_perform(curl);
+        -:  444:	
+        1:  445:		fileSize = ftell(fichier);
+        1:  446:		rewind(fichier);
+        -:  447:		
+        1:  448:		friendFile = malloc(fileSize * sizeof(char));
+        1:  449:		fread(friendFile, 1, fileSize, fichier);
+        1:  450:		fclose(fichier);
+        -:  451:		
+        -:  452:		/* Si la page commence par un script, 
+        -:  453:		la personne a protégée ses amis du public */
+        1:  454:		if (strncmp("<script>", friendFile, 8) != 0)
+        -:  455:		{
+        1:  456:			newFbFriends = extractFriendsFromHTML(newFbFriends, friendFile);
+        -:  457:		}	
+        -:  458:	
+        1:  459:		free(friendFile);
+        -:  460:	}
+        -:  461:
+        1:  462:	curl_slist_free_all(chunk);
+        1:  463:	curl_easy_cleanup(curl);
+        -:  464:
+        1:  465:	return newFbFriends;
+        -:  466:}
+        -:  467:
+        -:  468:/*
+        -:  469:*	Récupère les relations entre des amis donnés à partir de Facebook
+        -:  470:*	et retourne un tableau de relation.
+        -:  471:*	Test : testFacebookRelationships
+        -:  472:*
+        -:  473:*	@param fbFriends, amis + nb
+        -:  474:*	@param token, token d'auth Facebook
+        -:  475:*	@return tableau de relation (2 ID)
+        -:  476:*/
+        -:  477:struct facebookRelationships getFacebookRelationships(struct facebookFriends fbFriends, char* token)
+        1:  478:{	
+        -:  479:	struct facebookRelationships fbRel;
+        1:  480:	fbRel.relationships = malloc(sizeof(struct relationship));
+        1:  481:	fbRel.nbRel = 0;
+        -:  482:	
+        -:  483:	long fileSize;
+        -:  484:	char *relationshipsList, *relToken;
+        1:  485:	char *id1 = malloc(20 * sizeof(char));
+        1:  486:	char *id2 = malloc(20 * sizeof(char));
+        1:  487:	char *status = malloc(5 * sizeof(char));
+        -:  488:	FILE * fichier;
+        -:  489:	
+        1:  490:	if ((fbFriends.nbFriends * (fbFriends.nbFriends - 1))/2 > 250000)
+        -:  491:	{
+    #####:  492:		printf("Plusieurs requêtes seront necessaires\n");
+        -:  493:	}
+        -:  494:	
+        -:  495:	/* On envoi la requête de relation à Facebook 
+        -:  496:	et on écrit le résultat dans un fichier */
+        1:  497:	fichier = tmpfile();
+        1:  498:	writeFacebookRelationships(fbFriends, token, fichier, 0);
+        -:  499:	
+        1:  500:	fileSize = ftell(fichier);
+        1:  501:	rewind(fichier);
+        -:  502:
+        1:  503:	relationshipsList = malloc(fileSize * sizeof(char));
+        1:  504:	fgets(relationshipsList, fileSize, fichier);
+        1:  505:	fclose(fichier);
+        -:  506:	
+        -:  507:	/* On sépare sur } pour découper les différentes relations */
+        1:  508:	relToken = strtok(relationshipsList, "}");
+        -:  509:	
+       12:  510:	while (relToken != NULL)
+        -:  511:	{
+       10:  512:		if (sscanf(relToken, "%*[^{]{\"uid1\":%[^,],\"uid2\":%[^,],\"are_friends\":%s", id1, id2, status) != -1)
+        -:  513:		{	
+       10:  514:			if (strcmp(status, "true") == 0)
+        -:  515:			{			
+        3:  516:				strcpy(fbRel.relationships[fbRel.nbRel].id1, id1);
+        3:  517:				strcpy(fbRel.relationships[fbRel.nbRel].id2, id2);
+        3:  518:				fbRel.nbRel += 1;
+        -:  519:									
+        3:  520:				fbRel.relationships = 
+        -:  521:				(struct relationship*) realloc(fbRel.relationships, 
+        -:  522:				(fbRel.nbRel + 1) * (sizeof(struct relationship)));
+        -:  523:			}
+        -:  524:		}
+        -:  525:		
+       10:  526:		relToken = strtok(NULL, "}");
+        -:  527:	}
+        -:  528:	
+        1:  529:	free(id1);
+        1:  530:	free(id2);
+        1:  531:	free(status);
+        1:  532:	free(relationshipsList);
+        1:  533:	free(relToken);
+        -:  534:	
+        1:  535:	return fbRel;
+        -:  536:}
+        -:  537:
+        -:  538:/*
+        -:  539:*	Permet de générer des questions et des relations de manière aléatoire
+        -:  540:*	
+        -:  541:*	@param fbFriends, amis + nb
+        -:  542:*	@param nb, nombre de relations voulues
+        -:  543:*	@return tableau de relations (2 ID)
+        -:  544:*/
+        -:  545:struct facebookRelationships getFakeRelationships(struct facebookFriends fbFriends, int nb)
+        1:  546:{
+        -:  547:	int i;
+        -:  548:	struct facebookRelationships fbRel;
+        1:  549:	fbRel.relationships = malloc(nb * sizeof(struct relationship));
+        1:  550:	fbRel.nbRel = nb;
+        -:  551:	
+        4:  552:	for(i = 0; i < nb; ++i)
+        -:  553:	{
+        3:  554:		fbRel.relationships[i] = getRandomRelationship(fbFriends);
+        -:  555:	}
+        -:  556:	
+        1:  557:	return fbRel;
+        -:  558:}

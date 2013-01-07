@@ -1,0 +1,24 @@
+8
+Benjamin Crespo, 589, 56
+Yann Pravo, 478, 46
+Mathieu Triay, 86, 75
+Douglas Adams, 42, 24
+Charles Bukowski, 498, 54
+Chuck Palahniuk, 585, 45
+H.P Lovecraft, 345, 97
+JRR Tolkien, 469, 98
+11
+589, 86
+478, 86
+86, 42
+42, 86
+589, 498
+498, 589
+585, 589
+498, 585
+498, 469
+469, 585
+345, 585
+2
+86 -> 498
+86 -> 42

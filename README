@@ -1,0 +1,106 @@
+/*
+ _____ _                 _         __  __ 
+|  ___| | __ _ _ __  ___| |_ __ _ / _|/ _|
+| |_  | |/ _` | '_ \/ __| __/ _` | |_| |_
+|  _| | | (_| | |_) \__ \ || (_| |  _|  _|
+|_|   |_|\__,_| .__/|___/\__\__,_|_| |_| 
+              |_|
+Flapstaff is a Light And Powerful Social Text Analyser For Facebook
+
+Coders:
+benjamin.crespo.ballester(at)gmail(dot)com
+yann.pravo(at)gmail(dot)com
+mathieu.triay(at)gmail(dot)com
+
+Repo: http://bitbucket.org/nagy/flapstaff/
+*/
+
+I. Configuration
+
+Pour pouvoir compiler Flapstaff, vous aurez besoin de :
+LibCurl > 7.0 avec SSL
+gcc > 4.0
+
+Si vous souhaitez lancer les Unit Tests, vous aurez aussi besoin de :
+gcov > 4.0
+CU
+
+CU est livré avec Flapstaff et se trouve dans le répertoire "test".
+Vous devrez le compiler en vous déplaçant dans le répertoire ./cu et en lançant
+la commande "make". CU n'a pas été testé sous Windows.
+Vous devrez aussi créer un répertoire "results" dans le répertoire "test".
+
+II. Installation
+
+Pour lancer les Unit Tests et le Code Coverage, il vous suffit d'exécuter
+"codeCoverage.sh" dans le répertoire "test".
+
+Si certains tests ne passent pas, il se peut que votre architecture pose des problèmes.
+Si c'est le cas, veuillez envoyer un e-mail aux developpeurs.
+
+Une fois les tests passés, vous pouvez compiler Flapstaff en lançant la
+commande "make" dans le répertoire principal.
+
+III. Utilisation
+
+Vous pouvez utiliser Flapstaff pour générer un fichier de test provenant de
+Facebook, ou bien pour obtenir des informations relatives à un fichier de test.
+
+Dans le premier cas vous autoriserez l'application Flastaff à cette adresse:
+https://graph.facebook.com/oauth/authorize?client_id=106303829413149&redirect_uri=http://www.facebook.com/connect/login_success.html&type=user_agent&display=popup
+puis vous lancerez la commande suivante :
+
+./flapstaff mail passwd idFacebook fichierDest nbAmis nbQuest [fake]
+
+Mail : votre mail utilisé pour vous connecter à Facebook
+Passwd : votre password Facebook (il n'est pas stocké)
+idFacebook : ID correspondant aux mail et passwd (graph.facebook.com/username)
+fichierDest : Fichier où seront stocké les infos récupérées
+nbAmis : Nombre d'amis approximatif souhaités
+nbQuest : Nombre de questions exactes souhaités
+fake : paramètre optionnel. Il indique le nombre de fausse relation à générer.
+	   Si il est à 0, les informations seront alors récupérées à partir de Facebook (lent)
+	
+Dans le second cas :
+
+./flapstaff fichierSource fichierDest [importantPersons]
+
+fichierSource : fichier contenant les informations à analyser
+fichierDest : fichier où seront stocké les infos calculées
+importantPersons : paramètre optionnel. Si il est à 1, on calculera les personnes
+				   importantes de chaque composante (lent). 
+				   Si il est à 0, cette fonction est désactivée.
+
+Vous pouvez tester le programme avec les différents fichiers de test fournis 
+dans le répertoire "testFiles" (dans "test").
+
+IV. Problèmes et bugs connus
+
+La génération de relations provenant de Facebook peut s'avérer très lente
+et dans certains cas ne pas renvoyer de résultat.
+
+Le calcul des personnes importantes peut prendre beaucoup de temps.
+Cette option n'est pas recommandée au delà de 1000 personnes.
+
+V. Copyright
+
+WTFPL - Do What The Fuck You Want To Public License (http://sam.zoy.org/wtfpl/)
+
+           DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE 
+                   Version 2, December 2004 
+
+Copyright (C) 2004 Sam Hocevar <sam@hocevar.net> 
+
+Everyone is permitted to copy and distribute verbatim or modified 
+copies of this license document, and changing it is allowed as long 
+as the name is changed. 
+
+           DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE 
+  TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION 
+
+ 0. You just DO WHAT THE FUCK YOU WANT TO.
+
+VI. Changelog
+
+Un changelog peut être trouvé sur le repo Bitbucket:
+http://bitbucket.org/nagy/flapstaff/

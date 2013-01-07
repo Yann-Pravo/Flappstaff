@@ -1,0 +1,16 @@
+5
+Benjamin Crespo, 589, 56
+Yann Pravo, 478, 46
+Mathieu Triay, 86, 75
+Douglas Adams, 42, 24
+Charles Bukowski, 498, 54
+6
+589, 86
+478, 86
+86, 42
+42, 86
+589, 498
+498, 589
+2
+86 -> 498
+86 -> 42

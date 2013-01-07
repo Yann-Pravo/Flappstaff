@@ -1,0 +1,196 @@
+        -:    0:Source:../src/source/ParseFile.c
+        -:    0:Graph:../src/source/ParseFile.gcno
+        -:    0:Data:../src/source/ParseFile.gcda
+        -:    0:Runs:6
+        -:    0:Programs:1
+        -:    1:/*
+        -:    2: _____ _                 _         __  __ 
+        -:    3:|  ___| | __ _ _ __  ___| |_ __ _ / _|/ _|
+        -:    4:| |_  | |/ _` | '_ \/ __| __/ _` | |_| |_ 
+        -:    5:|  _| | | (_| | |_) \__ \ || (_| |  _|  _|
+        -:    6:|_|   |_|\__,_| .__/|___/\__\__,_|_| |_|  
+        -:    7:              |_|                         
+        -:    8:Flapstaff is a Light And Powerful Social Text Analyser For Facebook
+        -:    9:
+        -:   10:Coders:
+        -:   11:benjamin.crespo.ballester(at)gmail(dot)com
+        -:   12:yann.pravo(at)gmail(dot)com
+        -:   13:mathieu.triay(at)gmail(dot)com
+        -:   14:
+        -:   15:Repo: http://bitbucket.org/nagy/flapstaff/
+        -:   16:*/
+        -:   17:
+        -:   18:#include <math.h>
+        -:   19:#include "../headers/ParseFile.h"
+        -:   20:#include "../headers/TPersonne.h"
+        -:   21:#include "../headers/Graphe.h"
+        -:   22:
+        -:   23:/*	
+        -:   24:*	Construit le graphe en tant que structure (tab de personnes, matrice, tab de questions)
+        -:   25:*	en appelant successivement les différentes fonctions de construction.
+        -:   26:*
+        -:   27:*	@param fichier, fichier formaté correctement (voir README)
+        -:   28:*		contient les personnes, leurs relations, et les questions
+        -:   29:*/
+        -:   30:struct Graph genFromFile(FILE *fichier)
+       10:   31:{
+        -:   32:	int nbP, nbR, nbQ;
+        -:   33:	struct Graph graphToReturn;	
+        -:   34:	struct Personne *tabPers;
+        -:   35:	struct relationship *relations;
+        -:   36:	struct relationship *questions;
+        -:   37:	int **matrix;
+        -:   38:	
+       10:   39:	fscanf(fichier, "%d\n", &nbP);
+       10:   40:	tabPers = parseAllPersons(fichier, nbP);
+        -:   41:
+       10:   42:	fscanf(fichier, "%d\n", &nbR);
+       10:   43:	relations = parseAllRelations(fichier, nbR);
+       10:   44:	matrix = createMatrix(relations, nbP, tabPers, nbR);
+       10:   45:	free(relations);
+        -:   46:	
+       10:   47:	fscanf(fichier, "%d\n", &nbQ);
+       10:   48:	questions = parseAllQuestions(fichier, nbQ);
+        -:   49:	
+       10:   50:	graphToReturn.tabPersonnes = tabPers;
+       10:   51:	graphToReturn.nbPersonnes = nbP;
+       10:   52:	graphToReturn.matrix = matrix;
+       10:   53:	graphToReturn.questions = questions;
+       10:   54:	graphToReturn.nbQuestions = nbQ;
+        -:   55:
+       10:   56:	return graphToReturn;
+        -:   57:}
+        -:   58:	
+        -:   59:/*
+        -:   60:*	Extrait les personnes du fichier passé en paramètre
+        -:   61:*	et les place dans un tableau pour être utilisé plus tard
+        -:   62:*
+        -:   63:*	@param fichier, fichier formaté correctement (voir README)
+        -:   64:*		contient les personnes, leurs relations, et les questions
+        -:   65:*	@return un tableau de personnes extraites du fichier
+        -:   66:*/
+        -:   67:struct Personne* parseAllPersons(FILE *fichier, int nbPersonnes)
+       12:   68:{
+        -:   69:	struct Personne *tabPers;
+        -:   70:	int i;
+       12:   71:	char *ligne = malloc(80 * sizeof(char));
+       12:   72:	tabPers = malloc(nbPersonnes * sizeof(struct Personne));
+        -:   73:	
+       76:   74:	for (i = 0; i < nbPersonnes; i++)
+        -:   75:	{
+       64:   76:		fgets(ligne, 80, fichier);
+       64:   77:		tabPers[i] = parsePerson(ligne);
+       64:   78:		free(ligne);
+       64:   79:		ligne = malloc(80*sizeof(char));		
+        -:   80:	}
+        -:   81:	
+       12:   82:	free(ligne);
+        -:   83:
+       12:   84:	return tabPers;
+        -:   85:}
+        -:   86:
+        -:   87:/*
+        -:   88:*	Parse une ligne du fichier et extrait les informations relatives
+        -:   89:*	à la personne. Cette fonction ne doit être utilisé que lorsqu'on
+        -:   90:*	est sûr d'avoir affaire à une ligne contenant une personne.
+        -:   91:*	
+        -:   92:*	@param ligne, une ligne du fichier, doit contenir une personne
+        -:   93:*	@return une personne fabriquée à partir des infos extraites
+        -:   94:*/
+        -:   95:struct Personne parsePerson(char *ligne)
+       65:   96:{
+        -:   97:	struct Personne person;	
+        -:   98:	char nom[40];
+        -:   99:	char id[20];
+        -:  100:	int freq;
+        -:  101:	
+        -:  102:	/* On extrait les sous chaines directement ! */
+       65:  103:	sscanf(ligne, "%[^,], %[^,], %d \n", nom, id, &freq);
+        -:  104:
+       65:  105:	person = createPersonne(id,nom,freq);
+        -:  106:	
+       65:  107:	return person;
+        -:  108:}
+        -:  109:
+        -:  110:/*
+        -:  111:*	Parse une ligne du fichier et extrait les informations relatives
+        -:  112:*	à une relation. Cette fonction ne doit être utilisé que lorsqu'on
+        -:  113:*	est sûr d'avoir affaire à une ligne contenant une relation.
+        -:  114:*	
+        -:  115:*	@param ligne, une ligne du fichier, doit contenir une relation
+        -:  116:*	@return un tableau avec les ID des 2 personnes en relation
+        -:  117:*/
+        -:  118:struct relationship parseRelation(char *ligne)
+       80:  119:{
+        -:  120:	struct relationship rel;
+        -:  121:	
+        -:  122:	/* On extrait les sous chaines directement ! */
+       80:  123:	sscanf(ligne, "%[^,], %[^\n]\n", rel.id1, rel.id2);
+        -:  124:	
+       80:  125:	return rel;
+        -:  126:}
+        -:  127:
+        -:  128:/*
+        -:  129:*	Parse toutes les relations du fichier donné
+        -:  130:*	pourvu que le curseur de celui-ci soit à la bonne place.
+        -:  131:*
+        -:  132:*	@param fichier, fichier contenant les relations positionné à la première ligne
+        -:  133:*	@param nbRelation, nombre de relation à extraire. Nb extrait du fichier avant.
+        -:  134:*	@return Tableau de relation
+        -:  135:*/
+        -:  136:struct relationship* parseAllRelations(FILE *fichier, int nbRelation)
+       12:  137:{
+        -:  138:	int i;
+       12:  139:	struct relationship *tabRelation = malloc(nbRelation * sizeof(struct relationship));
+        -:  140:	
+       91:  141:	for (i = 0; i < nbRelation; i++)
+        -:  142:	{
+       79:  143:		char *ligne = malloc(50 * sizeof(char));
+       79:  144:		fgets(ligne, 50, fichier);
+       79:  145:		tabRelation[i] = parseRelation(ligne);
+       79:  146:		free(ligne);
+        -:  147:	}
+        -:  148:
+       12:  149:	return tabRelation;
+        -:  150:}
+        -:  151:
+        -:  152:/*
+        -:  153:*	Parse toutes les questions du fichier donné
+        -:  154:*	pourvu que le curseur de celui-ci soit à la bonne place.
+        -:  155:*
+        -:  156:*	@param fichier, fichier contenant les question positionné à la première ligne
+        -:  157:*	@param nbQuestions, nombre de questions à extraire. Nb extrait du fichier avant.
+        -:  158:*	@return Tableau de relation (questions)
+        -:  159:*/
+        -:  160:struct relationship* parseAllQuestions(FILE *fichier, int nbQuestions)
+       11:  161:{
+        -:  162:	int i;
+       11:  163:	struct relationship* tabQuestion = malloc(nbQuestions * sizeof(struct relationship));
+        -:  164:	
+       32:  165:	for (i = 0; i < nbQuestions; i++)
+        -:  166:	{
+       21:  167:		char *ligne = malloc(50 * sizeof(char));
+       21:  168:		fgets(ligne, 50, fichier);
+       21:  169:		tabQuestion[i] = parseQuestion(ligne);
+       21:  170:		free(ligne);
+        -:  171:	}
+        -:  172:	
+       11:  173:	return tabQuestion;		
+        -:  174:}
+        -:  175:/*
+        -:  176:*	Parse une ligne du fichier et extrait les informations relatives
+        -:  177:*	à une question. Cette fonction ne doit être utilisé que lorsqu'on
+        -:  178:*	est sûr d'avoir affaire à une ligne contenant une question.
+        -:  179:*	
+        -:  180:*	@param ligne, une ligne du fichier, doit contenir une question
+        -:  181:*	@return un tableau avec les ID des 2 personnes
+        -:  182:*/
+        -:  183:struct relationship parseQuestion(char *ligne)
+       22:  184:{
+        -:  185:	struct relationship quest;
+        -:  186:	
+        -:  187:	/* On extrait les sous chaines directement ! */
+       22:  188:	sscanf(ligne, "%[^ ] -> %s", quest.id1, quest.id2);
+        -:  189:	
+       22:  190:	return quest;
+        -:  191:}
